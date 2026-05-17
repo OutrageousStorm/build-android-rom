@@ -1,0 +1,54 @@
+name: Android ROM Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_device:
+        description: 'Device codename (e.g. lemonade, davinci)'
+        required: true
+        default: 'lemonade'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git curl wget zip unzip python3 openjdk-11-jdk
+      
+      - name: Setup build environment
+        run: |
+          mkdir -p ~/bin
+          export PATH=~/bin:$PATH
+          
+          # Install repo tool
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          
+          echo "Build environment ready"
+      
+      - name: Sync ROM source
+        run: |
+          mkdir -p ~/rom-build && cd ~/rom-build
+          ~/bin/repo init -u https://github.com/LineageOS/android.git -b lineage-21.0
+          ~/bin/repo sync --force-sync -j4
+      
+      - name: Build ROM
+        run: |
+          cd ~/rom-build
+          source build/envsetup.sh
+          lunch lineage_lemonade-user
+          make -j$(nproc) bacon
+      
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: lineage-build
+          path: ~/rom-build/out/target/product/*/lineage-*.zip
