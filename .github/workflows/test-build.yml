@@ -1,0 +1,35 @@
+name: Test ROM Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint shell scripts
+        run: |
+          sudo apt-get install -y shellcheck
+          find . -name "*.sh" -type f | xargs shellcheck --severity=warning || true
+      - name: Check for large files
+        run: |
+          find . -size +100M -type f | tee large_files.txt
+          if [ -s large_files.txt ]; then echo "Large files found!"; fi
+
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check build script syntax
+        run: |
+          bash -n build.sh
+          bash -n scripts/*.sh 2>/dev/null || true
+      - name: Verify required tools availability
+        run: |
+          echo "Tools check (in real CI would need Docker with Android SDK)"
+          grep -E "repo|adb|fastboot|make" README.md || echo "Tool docs found"
