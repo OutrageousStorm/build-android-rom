@@ -1,13 +1,29 @@
 #!/bin/bash
-# build_parallel.sh - Parallel Android ROM build with logging
+# build_parallel.sh — Build Android ROM in parallel with logging
+# Inspired by: parallel processing optimization (HN #5)
 set -e
-CORES=$(nproc)
+
 ROM_DIR=${1:-.}
-LOG_DIR="$ROM_DIR/build_logs"
+JOBS=${2:-$(nproc)}
+LOG_DIR="build_logs"
+
 mkdir -p "$LOG_DIR"
-echo "🔨 Building ROM with $CORES parallel jobs..."
+
+echo "🔨 Building $ROM_DIR with $JOBS parallel jobs"
+echo "📝 Logs: $LOG_DIR/"
+
 cd "$ROM_DIR"
 source build/envsetup.sh
-lunch lineage_$(getprop ro.product.device)-user 2>&1 | tee "$LOG_DIR/lunch.log"
-make -j$CORES 2>&1 | tee "$LOG_DIR/build.log"
-echo "✅ Build complete. Logs in $LOG_DIR"
+lunch lineage_device-userdebug
+
+# Parallel build with per-job logging
+m -j$JOBS 2>&1 | tee "$LOG_DIR/build_$(date +%s).log"
+
+if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
+    echo "✅ Build successful"
+    ls -lh out/target/product/*/lineage-*.zip
+else
+    echo "❌ Build failed"
+    tail -50 "$LOG_DIR"/*.log
+    exit 1
+fi
