@@ -1,30 +1,13 @@
 #!/bin/bash
-# build_parallel.sh — Parallel Android ROM build with progress monitoring
+# build_parallel.sh - Parallel Android ROM build with logging
 set -e
-
-THREADS=${1:-8}
-DEVICE=${2:-oriole}
-
-echo "🔨 Starting parallel ROM build for $DEVICE (using $THREADS threads)"
-echo "Start time: $(date)"
-
-# Set up environment
-. build/envsetup.sh
-lunch ${DEVICE}-user
-
-# Build with parallel jobs
-echo "Building lunch target..."
-time m -j${THREADS} 2>&1 | tee build_${DEVICE}_$(date +%s).log
-
-echo "\n✅ Build complete: $(date)"
-echo "Output: out/target/product/$DEVICE/system.img"
-
-# Verify outputs exist
-if [[ -f "out/target/product/$DEVICE/system.img" ]]; then
-  SIZE=$(du -h "out/target/product/$DEVICE/system.img" | cut -f1)
-  echo "System image size: $SIZE"
-  echo "Ready to flash via: adb reboot bootloader && fastboot flashall"
-else
-  echo "⚠️  system.img not found!"
-  exit 1
-fi
+CORES=$(nproc)
+ROM_DIR=${1:-.}
+LOG_DIR="$ROM_DIR/build_logs"
+mkdir -p "$LOG_DIR"
+echo "🔨 Building ROM with $CORES parallel jobs..."
+cd "$ROM_DIR"
+source build/envsetup.sh
+lunch lineage_$(getprop ro.product.device)-user 2>&1 | tee "$LOG_DIR/lunch.log"
+make -j$CORES 2>&1 | tee "$LOG_DIR/build.log"
+echo "✅ Build complete. Logs in $LOG_DIR"
